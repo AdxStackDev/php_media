@@ -1,0 +1,124 @@
+# IPTV Player - Git Ignore File
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+.phpintel/
+
+# PHP
+*.log
+*.cache
+vendor/
+composer.phar
+composer.lock
+
+# Session Files
+sessions/
+tmp/
+temp/
+
+# Environment Files
+.env
+.env.local
+.env.*.local
+config.local.php
+
+# Database Files (if added later)
+*.sql
+*.sqlite
+*.db
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*~
+
+# Logs
+logs/
+*.log
+error_log
+access_log
+
+# Cache
+cache/
+*.cache
+
+# User Uploads (if added later)
+uploads/
+user_data/
+
+# Node Modules (if using npm/yarn)
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# Build Files
+dist/
+build/
+
+# Test Files
+tests/coverage/
+phpunit.xml
+
+# Documentation Build
+docs/_build/
+
+# Sensitive Information
+credentials.php
+secrets.php
+api_keys.php
+
+# Temporary Files
+*.tmp
+*.temp
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Media Files (large files)
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.flv
+
+# Ignore specific config files with sensitive data
+database.php
+db_config.php
+
+# Keep empty directories
+!.gitkeep
