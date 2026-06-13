@@ -7,6 +7,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+if (!empty($_SESSION['logged_in']) && $_SESSION['logged_in'] === true){
+    header('Location: channel.php');
+}
+
 // Generate a CSRF token for the login form if one doesn't exist
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
