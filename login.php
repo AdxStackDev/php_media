@@ -3,25 +3,39 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Generate a CSRF token for the login form if one doesn't exist
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
 // Handle login form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
-    
-    // Hardcoded credentials (in production, use database with hashed passwords)
-    $validUsername = "admin";
-    $validPassword = "1234";
-    
-    if ($username === $validUsername && $password === $validPassword) {
-        $_SESSION['username'] = $username;
-        $_SESSION['logged_in'] = true;
-        $_SESSION['login_time'] = time();
-        header('Location: plan.php');
-        exit();
+    // Validate CSRF token before processing the login
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error = "Invalid or expired request. Please try again.";
     } else {
-        $error = "Invalid username or password";
+        $username = isset($_POST['username']) ? trim($_POST['username']) : '';
+        $password = isset($_POST['password']) ? trim($_POST['password']) : '';
+
+        // Hardcoded credentials
+        $validUsername = "admin";
+        $validPassword = "1234";
+
+        if ($username === $validUsername && $password === $validPassword) {
+            // Regenerate the session ID to prevent session fixation attacks
+            session_regenerate_id(true);
+            $_SESSION['username'] = $username;
+            $_SESSION['logged_in'] = true;
+            $_SESSION['login_time'] = time();
+            header('Location: plan.php');
+            exit();
+        } else {
+            $error = "Invalid username or password";
+        }
     }
 }
 ?>
@@ -44,6 +58,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <?php endif; ?>
         
         <form method="POST" action="">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
             <div class="mb-4">
                 <label for="username" class="block text-sm font-medium mb-2">Username</label>
                 <input type="text" id="username" name="username" required

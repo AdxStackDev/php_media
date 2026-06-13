@@ -3,7 +3,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check if user is logged in
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
@@ -14,6 +16,23 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 // Check if user has an active plan
 if (!isset($_SESSION['plan'])) {
     header('Location: plan.php');
+    exit();
+}
+
+// Backfill the expiry timestamp for plans purchased before this field existed
+if (!isset($_SESSION['plan_expires']) && isset($_SESSION['plan_purchase_date'], $_SESSION['plan_validity_days'])) {
+    $_SESSION['plan_expires'] = strtotime($_SESSION['plan_purchase_date']) + ((int)$_SESSION['plan_validity_days'] * 86400);
+}
+
+// Enforce plan expiration: if the plan has expired, clear it and send the user back to choose a plan
+if (isset($_SESSION['plan_expires']) && time() > $_SESSION['plan_expires']) {
+    unset(
+        $_SESSION['plan'],
+        $_SESSION['plan_purchase_date'],
+        $_SESSION['plan_validity_days'],
+        $_SESSION['plan_expires']
+    );
+    header('Location: plan.php?expired=1');
     exit();
 }
 ?>
@@ -43,6 +62,24 @@ if (!isset($_SESSION['plan'])) {
     }
     .channel-card:hover {
       transform: scale(1.02);
+    }
+    /* Light theme overrides toggled via the Theme Settings button */
+    body.light-mode {
+      background-color: #f3f4f6 !important;
+      color: #111827 !important;
+    }
+    body.light-mode header,
+    body.light-mode aside,
+    body.light-mode .channel-card {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+    }
+    body.light-mode .text-gray-400 {
+      color: #4b5563 !important;
+    }
+    body.light-mode input {
+      background-color: #e5e7eb !important;
+      color: #111827 !important;
     }
   </style>
 </head>
@@ -227,7 +264,7 @@ if (!isset($_SESSION['plan'])) {
           ];
           $gradientColor = isset($categoryColors[$safeCategory]) ? $categoryColors[$safeCategory] : 'from-gray-600 to-gray-800';
           
-          echo '<div class="channel-card bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300" data-category="' . $safeCategory . '">';
+          echo '<div class="channel-card bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300" data-category="' . $safeCategory . '" data-name="' . $safeChannelName . '">';
           echo '<div class="relative bg-gradient-to-br ' . $gradientColor . ' h-48 flex items-center justify-center group cursor-pointer" onclick="playChannel(\'' . $safeUrl . '\', \'' . $safeChannelName . '\')">';
           echo '<div class="text-center">';
           echo '<i class="fas fa-play-circle text-white text-6xl mb-3 group-hover:scale-110 transition-transform duration-300"></i>';
@@ -386,34 +423,57 @@ if (!isset($_SESSION['plan'])) {
       localStorage.setItem('recentChannels', JSON.stringify(recentChannels));
     }
 
-    // Quality Settings
+    // Quality Settings (uses HLS.js quality levels)
     function setQuality(quality) {
-      const video = document.getElementById('videoPlayerElement');
-      if (video) {
-        video.quality = quality;
+      if (!currentHls || !currentHls.levels || currentHls.levels.length === 0) {
+        alert('Start playing a channel before changing quality.');
+        return;
+      }
+      const levels = currentHls.levels;
+      switch (String(quality).toLowerCase()) {
+        case 'low':
+          currentHls.currentLevel = 0;
+          break;
+        case 'high':
+          currentHls.currentLevel = levels.length - 1;
+          break;
+        case 'medium':
+          currentHls.currentLevel = Math.floor((levels.length - 1) / 2);
+          break;
+        case 'auto':
+        default:
+          currentHls.currentLevel = -1; // -1 lets HLS.js pick automatically
+          break;
       }
     }
 
-    // Theme Toggle
+    // Theme Toggle (adds/removes a light-mode class and remembers the choice)
     function toggleTheme() {
-      document.body.classList.toggle('bg-gray-900');
-      document.body.classList.toggle('bg-white');
-      document.body.classList.toggle('text-white');
-      document.body.classList.toggle('text-gray-900');
+      document.body.classList.toggle('light-mode');
+      localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+    }
+
+    // Restore the saved theme on page load
+    if (localStorage.getItem('theme') === 'light') {
+      document.body.classList.add('light-mode');
     }
 
     // Button Event Listeners
     $('#favoritesBtn').click(function() {
       $('.channel-card').hide();
       favorites.forEach(channelName => {
-        $(`.channel-card:contains('${channelName}')`).show();
+        $('.channel-card').filter(function() {
+          return $(this).attr('data-name') === channelName;
+        }).show();
       });
     });
 
     $('#recentBtn').click(function() {
       $('.channel-card').hide();
       recentChannels.forEach(channelName => {
-        $(`.channel-card:contains('${channelName}')`).show();
+        $('.channel-card').filter(function() {
+          return $(this).attr('data-name') === channelName;
+        }).show();
       });
     });
 

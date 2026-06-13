@@ -1,10 +1,17 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Check if user is logged in
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header('Location: login.php');
     exit();
+}
+
+// Generate a CSRF token for the plan forms if one doesn't exist
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 ?>
 <!DOCTYPE html>
@@ -70,39 +77,60 @@ class Plan {
 
 // Process form submission
 $planPurchased = false;
+$planError = null;
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["plan"])) {
-    $selectedPlan = $_POST["plan"];
+    // Validate CSRF token before processing the purchase
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $planError = "Invalid or expired request. Please try again.";
+    } else {
+        $selectedPlan = $_POST["plan"];
 
-    switch ($selectedPlan) {
-        case "A":
-            $plan = new Plan("A", 7);
-            $planPrice = "$9.99";
-            break;
-        case "B":
-            $plan = new Plan("B", 30);
-            $planPrice = "$29.99";
-            break;
-        case "C":
-            $plan = new Plan("C", 365);
-            $planPrice = "$99.99";
-            break;
-        default:
-            echo "<div class='bg-red-500 text-white p-4 rounded'>Invalid plan selection.</div>";
-            exit;
+        switch ($selectedPlan) {
+            case "A":
+                $plan = new Plan("A", 7);
+                $planPrice = "$9.99";
+                break;
+            case "B":
+                $plan = new Plan("B", 30);
+                $planPrice = "$29.99";
+                break;
+            case "C":
+                $plan = new Plan("C", 365);
+                $planPrice = "$99.99";
+                break;
+            default:
+                echo "<div class='bg-red-500 text-white p-4 rounded'>Invalid plan selection.</div>";
+                exit;
+        }
+
+        // Purchase and check plan validity
+        $plan->purchase();
+        $isValid = $plan->isValid();
+
+        // Store plan in session
+        $_SESSION['plan'] = $selectedPlan;
+        $_SESSION['plan_purchase_date'] = date('Y-m-d H:i:s');
+        $_SESSION['plan_validity_days'] = $plan->validityDays;
+        // Store an absolute expiry timestamp so expiration can be enforced later
+        $_SESSION['plan_expires'] = time() + ($plan->validityDays * 86400);
+
+        $planPurchased = true;
     }
-
-    // Purchase and check plan validity
-    $plan->purchase();
-    $isValid = $plan->isValid();
-    
-    // Store plan in session
-    $_SESSION['plan'] = $selectedPlan;
-    $_SESSION['plan_purchase_date'] = date('Y-m-d H:i:s');
-    $_SESSION['plan_validity_days'] = $plan->validityDays;
-    
-    $planPurchased = true;
 }
 ?>
+
+            <?php if (isset($_GET['expired'])): ?>
+                <div class="bg-yellow-500 text-gray-900 p-4 rounded-lg mb-6">
+                    <h2 class="text-xl font-bold mb-1">Your plan has expired</h2>
+                    <p>Please choose a plan below to continue watching.</p>
+                </div>
+            <?php endif; ?>
+
+            <?php if (isset($planError)): ?>
+                <div class="bg-red-500 text-white p-4 rounded-lg mb-6">
+                    <?php echo htmlspecialchars($planError); ?>
+                </div>
+            <?php endif; ?>
 
             <?php if ($planPurchased): ?>
                 <div class="bg-green-500 text-white p-4 rounded-lg mb-6">
@@ -127,6 +155,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["plan"])) {
                         <li>✓ Multiple devices</li>
                     </ul>
                     <form method="POST" action="">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <input type="hidden" name="plan" value="A">
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                             Select Plan A
@@ -148,6 +177,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["plan"])) {
                         <li>✓ Priority support</li>
                     </ul>
                     <form method="POST" action="">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <input type="hidden" name="plan" value="B">
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                             Select Plan B
@@ -170,6 +200,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["plan"])) {
                         <li>✓ Save 72% annually</li>
                     </ul>
                     <form method="POST" action="">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
                         <input type="hidden" name="plan" value="C">
                         <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
                             Select Plan C
